@@ -58,6 +58,8 @@
 
 > 💡 To try it on one PC, run two copies of the app and use `127.0.0.1` as the receiver address.
 
+> 🛠️ Prefer to build it yourself? See [**Building from source**](#%EF%B8%8F-building-from-source): one command once Visual Studio and Qt are installed.
+
 ---
 
 ## 🖱️ How to use the GUI, step by step
@@ -181,6 +183,8 @@ receiver · `3` FAIL (loss, framing or data-field errors).
 
 ## ⚙️ How it works
 
+> 📘 New to UDP or the OSI model? Read [**Networking Concepts**](docs/NETWORKING_CONCEPTS.md) first.
+
 ### Architecture
 
 The UDP engine lives in `src/core` and has no GUI dependency. The GUI and the CLI are thin
@@ -279,24 +283,133 @@ sequenceDiagram
 
 ## 🛠️ Building from source
 
-Requires **Qt 6** (or Qt 5.15+) with *Widgets* and *Network*, a **C++17** compiler and
-**CMake 3.16+**.
+You can build the GUI and the CLI from source in about 15 minutes, most of it downloads.
+The steps below were tested on Windows 11 with Visual Studio 2022 Build Tools, CMake 4 and
+Qt 6.8.3.
+
+```mermaid
+flowchart TB
+    SRC["📁 Source<br/>git clone"] --> CFG["⚙️ CMake configure<br/>finds Qt + compiler"]
+    CFG --> CORE["udpbw_core<br/>static library"]
+    CORE --> GUI["UdpBandwidthTester.exe<br/>GUI"]
+    CORE --> CLI["udpbw-cli.exe<br/>CLI"]
+    GUI & CLI --> DEP["📦 windeployqt<br/>copies Qt DLLs"]
+    DEP --> ZIP["🗜️ Package zip<br/>+ VC++ runtime, docs"]
+    classDef step fill:#e8f0fe,stroke:#4a76c9,color:#1a1a1a
+    classDef out fill:#e6f4ea,stroke:#3c9a5f,color:#1a1a1a
+    class SRC,CFG,DEP step
+    class CORE,GUI,CLI,ZIP out
+```
+
+### Prerequisites (Windows)
+
+| Tool | Version | How to get it |
+|---|---|---|
+| **Visual Studio 2022** (Community, Professional, or just the free *Build Tools*) | 17.x | [visualstudio.microsoft.com](https://visualstudio.microsoft.com/downloads/). In the installer, select the **Desktop development with C++** workload |
+| **CMake** | 3.16 or newer | Included with Visual Studio's C++ workload, or from [cmake.org](https://cmake.org/download/) (tick *Add CMake to PATH*) |
+| **Qt** | 6.x (or 5.15) for **MSVC 2022 64-bit**, modules *Qt Base* (Core, Network, Widgets) | Step 2 below |
+| **Git** | any | [git-scm.com](https://git-scm.com/) |
+
+### Step 1: Get the source
 
 ```bat
-:: Windows: from an "x64 Native Tools Command Prompt for VS 2022"
+git clone https://github.com/Hitheshkaranth/UDP_TEST_BENCH_V1.git
+cd UDP_TEST_BENCH_V1
+```
+
+### Step 2: Install Qt
+
+**Option A: Qt Online Installer** (needs a free Qt account). Download it from
+[qt.io/download-qt-installer](https://www.qt.io/download-qt-installer). In the component
+list choose **Qt 6.8.x → MSVC 2022 64-bit**; nothing else is needed. The default location
+is `C:\Qt\6.8.x\msvc2022_64`.
+
+**Option B: aqtinstall** (no account; this is how this project was built):
+
+```bat
+pip install aqtinstall
+aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O C:\Qt
+```
+
+> ⚠️ Keep the `-O` folder short (like `C:\Qt`). Long paths hit the Windows 260-character
+> limit and aqt fails with *"Specified path is bad"*.
+
+### Step 3: Build
+
+**Option A: one command (recommended).** The script finds Visual Studio, configures,
+builds in Release mode and copies the Qt DLLs next to the exes:
+
+```bat
+powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1 -QtDir C:\Qt\6.8.3\msvc2022_64
+```
+
+Add `-Package` to also create the ready-to-run zip in `dist\UdpBandwidthTester_win64.zip`,
+which includes the Qt DLLs, the Visual C++ runtime, the docs and the firewall script.
+
+**Option B: by hand.** Open **"x64 Native Tools Command Prompt for VS 2022"** from the
+Start menu, so the compiler is on PATH, then:
+
+```bat
 cmake -S . -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
 cmake --build build
 C:\Qt\6.8.3\msvc2022_64\bin\windeployqt.exe --release build\UdpBandwidthTester.exe build\udpbw-cli.exe
 ```
 
-```bash
-# Linux
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
+`-G Ninja` also works if Ninja is installed, and builds faster.
+
+**Option C: Qt Creator.** Open `CMakeLists.txt` (or `UdpBandwidthTester.pro` /
+`udpbw-cli.pro` for qmake), select the *Desktop Qt 6.8.x MSVC2022 64bit* kit, set the
+build type to *Release*, and press **Ctrl+B**.
+
+### Step 4: Run and check the build
+
+```bat
+:: GUI
+build\UdpBandwidthTester.exe
+
+:: CLI self-test on one PC: receiver in one window ...
+build\udpbw-cli.exe -s --once
+:: ... sender in a second window. Expect "RESULT : PASS"
+build\udpbw-cli.exe -c 127.0.0.1 -b 50M -t 3
 ```
 
-This builds three targets: `udpbw_core` (static library), `UdpBandwidthTester` (GUI) and
-`udpbw-cli` (CLI). There are also qmake projects (`UdpBandwidthTester.pro`,
-`udpbw-cli.pro`) for Qt Creator.
+To run the exes on another PC, copy the whole `build` folder (exe + Qt DLLs + plugin
+folders), or use the `-Package` zip.
+
+### Building on Linux
+
+```bash
+sudo apt install build-essential cmake qt6-base-dev     # Debian / Ubuntu 22.04+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./build/udpbw-cli -s --once &  ./build/udpbw-cli -c 127.0.0.1 -t 3
+```
+
+> The core and the CLI use only portable Qt APIs. The Linux build has not yet been tested
+> in this project.
+
+### What gets built
+
+| Target | Type | Contents | Qt modules |
+|---|---|---|---|
+| `udpbw_core` | static library | `src/core`: the UDP engine | Core, Network |
+| `UdpBandwidthTester` | Windows GUI app | `src/gui` + `udpbw_core` | + Widgets |
+| `udpbw-cli` | console app | `src/cli` + `udpbw_core` | Core, Network |
+
+The compiler runs with all warnings on (`/W4` on MSVC, `-Wall -Wextra` on GCC/Clang); the
+code builds without warnings.
+
+### Build troubleshooting
+
+| Message | Fix |
+|---|---|
+| `Could not find a package configuration file provided by "Qt6"` | Pass the Qt kit folder: `-DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64` (or `-QtDir` for the script) |
+| `No CMAKE_CXX_COMPILER could be found` / `'cl' is not recognized` | Use the *x64 Native Tools Command Prompt*, or the build script, which sets up the compiler itself |
+| `Qt6Core.dll was not found` when starting the exe | Run `windeployqt` (Step 3), or add `C:\Qt\6.8.3\msvc2022_64\bin` to PATH |
+| `VCRUNTIME140.dll was not found` on another PC | Use the `-Package` zip (it includes the runtime), or install the *VC++ 2015–2022 Redistributable* |
+| aqt: *"Specified path is bad"* | Install Qt to a short path such as `C:\Qt` |
+| windeployqt warns *"Cannot find dxcompiler.dll"* / *"VCINSTALLDIR is not set"* | Harmless: the app doesn't need DirectX shader compilers, and the script copies the VC++ runtime itself |
+| Changed `CMakeLists.txt` and the build fails strangely | Delete the `build` folder and configure again |
 
 ---
 
@@ -319,10 +432,13 @@ src/core/   UDP engine: framing, sending, receiving, validation, statistics (no 
 src/gui/    Qt Widgets front end
 src/cli/    Command-line front end
 docs/       Documentation and screenshots
+scripts/    build_windows.ps1 (build + package), allow_firewall_port_5201.bat
 ```
 
 | Document | Contents |
 |---|---|
+| [**UDP_Bandwidth_Tester_Documentation.docx**](docs/UDP_Bandwidth_Tester_Documentation.docx) | All documentation in one Word file: user guide, networking concepts, API reference, source guide |
+| [**docs/NETWORKING_CONCEPTS.md**](docs/NETWORKING_CONCEPTS.md) | How UDP works, the OSI model, encapsulation, MTU, and how bandwidth, loss and jitter are measured, with worked examples |
 | [**docs/API_REFERENCE.md**](docs/API_REFERENCE.md) | Every class and function: parameters, return values, what it does, how to use it, with flow charts |
 | [**docs/SOURCE_GUIDE.md**](docs/SOURCE_GUIDE.md) | How transmission, reception and monitoring work internally: algorithms, formulas, threading |
 

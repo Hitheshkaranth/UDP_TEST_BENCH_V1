@@ -26,7 +26,7 @@ value, what it does and how to use it.
 ## How the pieces fit together
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph YOU["Your code / GUI / CLI"]
         CFG["SenderConfig<br/>target, port, rate,<br/>duration, payload"]
         PB["Payload::build()<br/>validated data field"]
@@ -395,7 +395,7 @@ Checks the framing and, if it's valid, copies the header into `h`.
 **Returns** `false` (with `h` untouched) on bad framing.
 
 ```mermaid
-flowchart LR
+flowchart TB
     IN["received datagram"] --> L{"length ≥ 25?"}
     L -- no --> BAD["framing error"]
     L -- yes --> S{"starts with<br/>FE FA?"}
