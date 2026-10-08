@@ -1,0 +1,23 @@
+# Build output
+build/
+build-*/
+out/
+*.obj
+*.o
+*.exe
+*.dll
+*.pdb
+*.ilk
+
+# Packaged binaries (published as GitHub Release assets instead)
+dist/
+
+# IDE / tool files
+.vs/
+.vscode/
+*.user
+*.autosave
+CMakeUserPresets.json
+
+# Logs
+*.log
